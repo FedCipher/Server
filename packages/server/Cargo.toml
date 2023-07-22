@@ -1,0 +1,18 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+actix-web = "4.3.1"
+common = { path = "../common" }
+mail = { path = "../mail" }
+serde = { version = "1.0.171", features = ["derive"] }
+log = "0.4.19"
+log4rs = "1.2.0"
+clap = { version = "4.3.11", features = ["derive"] }
+toml = "0.7.6"
+actix-server = "2.2.0"
+anyhow = "1.0.72"
