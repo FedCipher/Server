@@ -13,10 +13,10 @@ pub enum TypeConversionError {
 }
 
 impl fmt::Display for TypeConversionError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TypeConversionError::InvalidLength(length) => write!(f, "expected 24 bytes but got {}", length),
-            TypeConversionError::Decode(error) => write!(f, "{}", error)
+            TypeConversionError::InvalidLength(length) => write!(formatter, "expected 24 bytes but got {}", length),
+            TypeConversionError::Decode(error) => write!(formatter, "{}", error)
         }
     }
 }

@@ -16,7 +16,7 @@ pub struct Address {
     pub host: String
 }
 
-const HOST_PATTERN: &str = r"([a-zA-Z_-]{32})@((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9])";
+const HOST_PATTERN: &str = r"([a-zA-Z0-9_-]{32})@((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9])";
 
 #[derive(Debug)]
 pub enum ParseError {

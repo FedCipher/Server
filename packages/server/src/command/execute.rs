@@ -1,21 +1,21 @@
-use std::io::{Result, Error, ErrorKind};
+use std::io;
 
 use super::launch::launch;
 use super::info::info;
 use super::parse::{Arguments, Commands};
 
-pub async fn execute(arguments: &Arguments) -> Result<()> {
+pub async fn execute(arguments: &Arguments) -> io::Result<()> {
     match &arguments.command {
         Commands::Launch { path } => {
             let server = launch(path, arguments).map_err(|error| {
-                Error::new(ErrorKind::Other, error)
+                io::Error::new(io::ErrorKind::Other, error)
             })?;
 
             server.await
         },
         Commands::Info { path } => {
             info(path, arguments).map_err(|error| {
-                Error::new(ErrorKind::Other, error)
+                io::Error::new(io::ErrorKind::Other, error)
             })?;
 
             Ok(())

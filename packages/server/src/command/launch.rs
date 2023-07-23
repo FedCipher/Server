@@ -9,8 +9,6 @@ use crate::command::parse::Arguments;
 use crate::configuration::configure::{configure, ConfigurationError};
 use crate::configuration::init::{init_logging, InitializeError};
 
-const LOG_FORMAT: &str = "%t %{r}a %r %s";
-
 #[derive(Debug)]
 pub enum LaunchCommandError {
     Configure(ConfigurationError),
@@ -37,6 +35,8 @@ impl std::error::Error for LaunchCommandError {
         }
     }
 }
+
+const LOG_FORMAT: &str = "%t %{r}a %r %s %bB %Dms";
 
 pub fn launch(path: &Option<String>, arguments: &Arguments) -> Result<Server, LaunchCommandError> {
     let configuration = configure(path).map_err(LaunchCommandError::Configure)?;
