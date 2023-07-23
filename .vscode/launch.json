@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "build"
+                ]
+            },
+            "args": [ "-v", "launch" ],
+            "cwd": "${workspaceFolder}",
+            "terminal": "console"
+        }
+    ]
+}
