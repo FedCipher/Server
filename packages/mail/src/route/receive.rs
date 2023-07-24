@@ -1,21 +1,16 @@
-use log::info;
-use actix_web::web::Json;
-use actix_web::{get, post, HttpResponse, Responder, Result};
-use common::model::{Identifier, Address, Labels};
+use actix_web::web::{Data, Json};
+use actix_web::{get, Responder, Result};
+use common::model::{Identifier, Address};
 
 use crate::model::{SealedLetter, LetterAttachments, EmbeddedAttachment, RemoteAttachment};
+use crate::state::MailState;
 
-#[post("/api/v1/mail")]
-pub async fn receive_mail(data: Json<SealedLetter>) -> impl Responder {
-    let letter = data.into_inner();
+#[get("")]
+pub async fn send_mail(state: Data<MailState>) -> Result<impl Responder> {
+    let mut counter = state.total_sent_letters.lock().unwrap();
 
-    info!("{:?}", letter);
+    *counter += 1;
 
-    HttpResponse::Ok()
-}
-
-#[get("/api/v1/mail")]
-pub async fn send_mail() -> Result<impl Responder> {
     let sender = Address {
         id: Identifier::new(),
         host: String::from("example.com")
@@ -30,7 +25,7 @@ pub async fn send_mail() -> Result<impl Responder> {
         EmbeddedAttachment {
             id: Identifier::new(),
             size: 0,
-            labels: None,
+            labels: Default::default(),
             data: vec![].into(),
             signature: Some(
                 vec![].into()
@@ -45,26 +40,22 @@ pub async fn send_mail() -> Result<impl Responder> {
                 host: String::from("example.com")
             },
             size: 0,
-            labels: None,
+            labels: Default::default(),
             signature: Some(
                 vec![].into()
             )
         }
     ];
     let attachments = LetterAttachments {
-        embedded: Some(embedded),
-        remote: Some(remote)
+        embedded,
+        remote
     };
     let letter = SealedLetter {
         id: Identifier::new(),
         sender: Some(sender),
         recipients,
         attachments: Some(attachments),
-        labels: Some(
-            Labels::from([
-                (String::from(""), String::from(""))
-            ])
-        ),
+        labels: Default::default(),
         subject: Some(
             vec![].into()
         ),

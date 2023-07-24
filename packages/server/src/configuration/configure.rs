@@ -1,12 +1,11 @@
 use std::fs::read_to_string;
 use std::fmt;
 use log::Level;
+use mail::configuration::MailConfiguration;
 use serde::{Serialize, Deserialize};
 use toml::from_str;
 
-type Bind = (String, u16);
-
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Logging {
     /// The location of the logging configuration file.
     pub path: Option<String>,
@@ -15,16 +14,28 @@ pub struct Logging {
     pub level: Option<Level>
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Http {
-    pub bind: Bind
+    /// The local IP address & port to bind the HTTP server to.
+    pub bind: (String, u16),
+
+    /// The host name of this instance.
+    pub host: String,
+
+    /// An optional path prefix to serve the API on.
+    pub directory: Option<String>
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Configuration {
+    /// The logging configuration.
     pub logging: Logging,
 
-    pub http: Http
+    /// The HTTP server configuration.
+    pub http: Http,
+
+    /// The mail service configuration.
+    pub mail: MailConfiguration
 }
 
 impl Default for Logging {
@@ -39,7 +50,9 @@ impl Default for Logging {
 impl Default for Http {
     fn default() -> Self {
         Self {
-            bind: ("localhost".to_string(), 8100)
+            bind: (String::from("localhost"), 8100),
+            host: String::from("localhost:8100"),
+            directory: None
         }
     }
 }

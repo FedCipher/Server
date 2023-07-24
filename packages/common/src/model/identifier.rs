@@ -43,7 +43,7 @@ pub type UUID = [u8; 24];
 /// A 24 byte (192 bit) unique identifier.
 ///
 /// All identifiers must be locally unique.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Identifier(UUID);
 
 impl fmt::Display for Identifier {

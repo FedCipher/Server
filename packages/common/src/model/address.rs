@@ -7,7 +7,7 @@ use serde::de;
 use super::{Identifier, TypeConversionError};
 
 /// A globally unique address.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Address {
     /// The locally unique identifier for a piece of data on a host.
     pub id: Identifier,

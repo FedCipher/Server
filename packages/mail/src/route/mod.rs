@@ -1,5 +1,7 @@
-pub mod mail;
+pub mod send;
+pub mod receive;
 pub mod admin;
 
-pub use self::mail::*;
-pub use self::admin::*;
+pub use send::*;
+pub use receive::*;
+pub use admin::*;

@@ -6,7 +6,7 @@ use serde::de::Error;
 pub type OptionalBlob = Option<Blob>;
 
 /// An arbitrary block of binary data.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Blob(Vec<u8>);
 
 impl From<Vec<u8>> for Blob {

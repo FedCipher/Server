@@ -4,7 +4,7 @@ use common::model::{Identifier, Address, Labels, Blob};
 use super::LetterAttachments;
 
 /// A letter that has been partially encrypted by the client.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SealedLetter {
     /// The locally unique identifier of the letter.
     pub id: Identifier,
@@ -19,7 +19,8 @@ pub struct SealedLetter {
     pub attachments: Option<LetterAttachments>,
 
     /// Any labels added to the letter.
-    pub labels: Option<Labels>,
+    #[serde(default)]
+    pub labels: Labels,
 
     /// The encrypted subject line of the letter.
     pub subject: Option<Blob>,

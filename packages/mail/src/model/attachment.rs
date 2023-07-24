@@ -3,7 +3,7 @@ use serde::{Serialize, Deserialize};
 use common::model::{Identifier, Address, Labels, Blob};
 
 /// A sealed attachment that was provided as part of a letter.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EmbeddedAttachment {
     /// A locally unique identifier for this attachment.
     pub id: Identifier,
@@ -12,7 +12,8 @@ pub struct EmbeddedAttachment {
     pub size: u64,
 
     /// Any attachment labels.
-    pub labels: Option<Labels>,
+    #[serde(default)]
+    pub labels: Labels,
 
     /// The encrypted attachment data.
     pub data: Blob,
@@ -22,7 +23,7 @@ pub struct EmbeddedAttachment {
 }
 
 /// A sealed attachment that is known to exist only on a remote host.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RemoteAttachment {
     /// A locally unique identifier for this attachment.
     pub id: Identifier,
@@ -34,14 +35,15 @@ pub struct RemoteAttachment {
     pub size: u64,
 
     /// Any attachment labels.
-    pub labels: Option<Labels>,
+    #[serde(default)]
+    pub labels: Labels,
 
     /// A digital signature for the attachment.
     pub signature: Option<Blob>
 }
 
 /// A sealed attachment that exists on the local host.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LocalAttachment {
     /// A locally unique identifier for this attachment.
     pub id: Identifier,
@@ -53,7 +55,8 @@ pub struct LocalAttachment {
     pub size: u64,
 
     /// Any attachment labels.
-    pub labels: Option<Labels>,
+    #[serde(default)]
+    pub labels: Labels,
 
     /// The encrypted attachment data.
     pub data: Blob,
@@ -62,11 +65,13 @@ pub struct LocalAttachment {
     pub signature: Option<Blob>
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LetterAttachments {
     /// All embedded attachments for a letter.
-    pub embedded: Option<Vec<EmbeddedAttachment>>,
+    #[serde(default)]
+    pub embedded: Vec<EmbeddedAttachment>,
 
     /// All remote attachments for a letter.
-    pub remote: Option<Vec<RemoteAttachment>>,
+    #[serde(default)]
+    pub remote: Vec<RemoteAttachment>
 }
