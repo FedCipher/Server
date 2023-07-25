@@ -9,3 +9,5 @@ actix-web = "4.3.1"
 log = "0.4.19"
 serde = { version = "1.0.173", features = ["derive"] }
 redis = { version = "0.23.0", features = ["json", "tokio-comp", "connection-manager"] }
+mobc = "0.8.1"
+mobc-redis = "0.8.0"

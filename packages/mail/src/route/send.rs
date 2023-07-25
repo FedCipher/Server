@@ -1,11 +1,10 @@
 use std::fmt;
 use actix_web::body::BoxBody;
-use actix_web::web::{block, Data, Json};
+use actix_web::web::{Data, Json};
 use actix_web::{get, Responder, Result, ResponseError, HttpResponse};
 use common::model::{Identifier, Address};
-use common::database::redis::{get_connection, R2D2Pool, RedisDatabaseError};
-use redis::RedisError;
-use redis::Commands;
+use common::database::redis::{get_connection, MobcPool, RedisDatabaseError};
+use mobc_redis::redis::{AsyncCommands, RedisError};
 
 use crate::model::{SealedLetter, LetterAttachments, EmbeddedAttachment, RemoteAttachment};
 
@@ -36,17 +35,23 @@ impl ResponseError for SendMailError {
     }
 }
 
-fn increment(pool: Data<R2D2Pool>) -> Result<(), SendMailError> {
-    let mut connection = get_connection(&pool).map_err(SendMailError::CreateRedisConnection)?;
+async fn increment(pool: &MobcPool) -> Result<(), SendMailError> {
+    let mut connection = get_connection(pool)
+        .await
+        .map_err(SendMailError::CreateRedisConnection)?;
 
-    connection.incr::<&str, u64, ()>(TOTAL_SENT_LETTERS, 1).map_err(SendMailError::Increment)?;
+    connection
+        .incr::<&str, u64, ()>(TOTAL_SENT_LETTERS, 1)
+        .await
+        .map_err(SendMailError::Increment)?;
 
     Ok(())
 }
 
+
 #[get("")]
-pub async fn send_mail(pool: Data<R2D2Pool>) -> Result<impl Responder> {
-    block(|| increment(pool)).await??;
+pub async fn send_mail(pool: Data<MobcPool>) -> Result<impl Responder> {
+    increment(&pool).await?;
 
     let sender = Address {
         id: Identifier::new(),

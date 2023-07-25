@@ -1,13 +1,12 @@
 use std::collections::HashSet;
 use std::fmt;
 use log::debug;
-use actix_web::web::{block, Data, Json};
+use actix_web::web::{Data, Json};
 use actix_web::body::BoxBody;
 use actix_web::{post, HttpResponse, Responder, Result, ResponseError};
 use common::model::Labels;
-use common::database::redis::{get_connection, R2D2Pool, RedisDatabaseError};
-use redis::RedisError;
-use redis::Commands;
+use common::database::redis::{get_connection, MobcPool, RedisDatabaseError};
+use mobc_redis::redis::{AsyncCommands, RedisError};
 
 use crate::model::{SealedLetter, LetterAttachments};
 use crate::configuration::MailConfiguration;
@@ -180,10 +179,15 @@ fn validate_letter(letter: SealedLetter, configuration: Data<MailConfiguration>)
 
 const TOTAL_RECEIVED_LETTERS: &str = "TOTAL_RECEIVED_LETTERS";
 
-fn increment(pool: Data<R2D2Pool>) -> Result<(), ReceiveMailError> {
-    let mut connection = get_connection(&pool).map_err(ReceiveMailError::CreateRedisConnection)?;
+async fn increment(pool: &MobcPool) -> Result<(), ReceiveMailError> {
+    let mut connection = get_connection(pool)
+        .await
+        .map_err(ReceiveMailError::CreateRedisConnection)?;
 
-    connection.incr::<&str, u64, ()>(TOTAL_RECEIVED_LETTERS, 1).map_err(ReceiveMailError::Increment)?;
+    connection
+        .incr::<&str, u64, ()>(TOTAL_RECEIVED_LETTERS, 1)
+        .await
+        .map_err(ReceiveMailError::Increment)?;
 
     Ok(())
 }
@@ -192,7 +196,7 @@ fn increment(pool: Data<R2D2Pool>) -> Result<(), ReceiveMailError> {
 pub async fn receive_mail(
     json: Json<SealedLetter>,
     configuration: Data<MailConfiguration>,
-    pool: Data<R2D2Pool>
+    pool: Data<MobcPool>
 ) -> Result<impl Responder> {
     let letter = json.into_inner();
 
@@ -203,7 +207,7 @@ pub async fn receive_mail(
         None => debug!("Received an anonymous letter")
     }
 
-    block(|| increment(pool)).await??;
+    increment(&pool).await?;
 
     Ok(HttpResponse::Ok())
 }
