@@ -3,8 +3,6 @@ name = "server"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 actix-web = "4.3.1"
 common = { path = "../common" }
@@ -16,3 +14,4 @@ clap = { version = "4.3.11", features = ["derive"] }
 toml = "0.7.6"
 actix-server = "2.2.0"
 anyhow = "1.0.72"
+redis = { version = "0.23.0", features = ["json", "tokio-comp", "connection-manager"] }

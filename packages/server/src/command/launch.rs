@@ -7,6 +7,7 @@ use common::state::CommonState;
 use log::info;
 use mail::route::{receive_mail, send_mail};
 use mail::state::MailState;
+use common::database::redis::{create_pool, RedisDatabaseError};
 
 use crate::route::{healthcheck, id};
 use crate::command::parse::Arguments;
@@ -17,7 +18,8 @@ use crate::configuration::init::{init_logging, InitializeError};
 pub enum LaunchCommandError {
     Configure(ConfigurationError),
     Initialize(InitializeError),
-    IO(std::io::Error)
+    IO(std::io::Error),
+    Redis(RedisDatabaseError)
 }
 
 impl fmt::Display for LaunchCommandError {
@@ -25,7 +27,8 @@ impl fmt::Display for LaunchCommandError {
         match self {
             LaunchCommandError::Configure(error) => write!(formatter, "{}", error),
             LaunchCommandError::Initialize(error) => write!(formatter, "{}", error),
-            LaunchCommandError::IO(error) => write!(formatter, "{}", error)
+            LaunchCommandError::IO(error) => write!(formatter, "{}", error),
+            LaunchCommandError::Redis(error) => write!(formatter, "{}", error)
         }
     }
 }
@@ -35,7 +38,8 @@ impl std::error::Error for LaunchCommandError {
         match *self {
             LaunchCommandError::Configure(ref error) => Some(error),
             LaunchCommandError::Initialize(ref error) => Some(error),
-            LaunchCommandError::IO(ref error) => Some(error)
+            LaunchCommandError::IO(ref error) => Some(error),
+            LaunchCommandError::Redis(ref error) => Some(error)
         }
     }
 }
@@ -43,34 +47,39 @@ impl std::error::Error for LaunchCommandError {
 const LOG_FORMAT: &str = "%t %{r}a %r %s %bB %Dms";
 const API_VERSION: &str = "v1";
 
-pub fn launch(path: &Option<String>, arguments: &Arguments) -> Result<Server, LaunchCommandError> {
+pub async fn launch(path: &Option<String>, arguments: &Arguments) -> Result<Server, LaunchCommandError> {
     let configuration = configure(path)
         .map_err(LaunchCommandError::Configure)?;
 
     init_logging(&configuration.logging.path, &arguments.verbosity)
         .map_err(LaunchCommandError::Initialize)?;
 
+    let pool = create_pool("redis://localhost:6379")
+        .map_err(LaunchCommandError::Redis)?;
+
     info!("Starting HTTP server at {}:{}", configuration.http.bind.0, configuration.http.bind.1);
 
-    let bind = configuration.clone().http.bind;
-    let server = HttpServer::new( move || {
-        let mail_state_data = Data::new(MailState::default());
-        let common_state_data = Data::new(CommonState::default());
-        let mail_configuration_data = Data::new(configuration.clone().mail);
+    let root = match configuration.http.directory {
+        Some(value) => format!("{}/{}", value, API_VERSION),
+        None => String::from(API_VERSION)
+    };
 
+    let pool_data = Data::new(pool);
+    let mail_state_data = Data::new(MailState::default());
+    let common_state_data = Data::new(CommonState::default());
+    let mail_configuration_data = Data::new(configuration.mail.clone());
+
+    let bind = configuration.http.bind;
+    let server = HttpServer::new(move || {
         let mail_scope = scope("mail")
-            .app_data(mail_state_data)
-            .app_data(mail_configuration_data)
+            .app_data(pool_data.clone())
+            .app_data(mail_state_data.clone())
+            .app_data(mail_configuration_data.clone())
             .service(receive_mail)
             .service(send_mail);
 
-        let root = match &configuration.http.directory {
-            Some(value) => format!("{}/{}", value, API_VERSION),
-            None => String::from(API_VERSION)
-        };
-
         let root_scope = scope(&root)
-            .app_data(common_state_data)
+            .app_data(common_state_data.clone())
             .service(healthcheck)
             .service(id)
             .service(mail_scope);

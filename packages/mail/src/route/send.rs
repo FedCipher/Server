@@ -1,134 +1,110 @@
-use std::collections::HashSet;
 use std::fmt;
-use log::debug;
-use actix_web::web::{Data, Json};
 use actix_web::body::BoxBody;
-use actix_web::{post, HttpResponse, Responder, Result, ResponseError};
-use common::model::Labels;
+use actix_web::web::{block, Data, Json};
+use actix_web::{get, Responder, Result, ResponseError, HttpResponse};
+use common::model::{Identifier, Address};
+use common::database::redis::{get_connection, R2D2Pool, RedisDatabaseError};
+use redis::RedisError;
+use redis::Commands;
 
-use crate::model::{SealedLetter, LetterAttachments};
-use crate::configuration::MailConfiguration;
-use crate::state::MailState;
+use crate::model::{SealedLetter, LetterAttachments, EmbeddedAttachment, RemoteAttachment};
+
+const TOTAL_SENT_LETTERS: &str = "TOTAL_SENT_LETTERS";
 
 #[derive(Debug)]
-pub enum ReceiveMailError {
-    NoRecipients,
-    AnonymousSender,
-    Unsigned,
-    UnsignedAttachments,
-    NoSubject,
-    NoBody,
-    MissingLabels(HashSet<String>)
+pub enum SendMailError {
+    CreateRedisConnection(RedisDatabaseError),
+    Increment(RedisError)
 }
 
-impl fmt::Display for ReceiveMailError {
+impl fmt::Display for SendMailError {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ReceiveMailError::NoRecipients => {
-                write!(formatter, "At least one recipient must be provided")
+            SendMailError::CreateRedisConnection(error) => {
+                write!(formatter, "{}", error)
             },
-            ReceiveMailError::AnonymousSender => {
-                write!(formatter, "Anonymous senders are forbidden")
-            },
-            ReceiveMailError::Unsigned => {
-                write!(formatter, "Unsigned letters are forbidden")
-            }
-            ReceiveMailError::UnsignedAttachments => {
-                write!(formatter, "Unsigned attachments are forbidden")
-            },
-            ReceiveMailError::NoSubject => {
-                write!(formatter, "A letter subject is required")
-            },
-            ReceiveMailError::NoBody => {
-                write!(formatter, "A letter body is required")
-            },
-            ReceiveMailError::MissingLabels(value) => {
-                write!(formatter, "The following labels are required: {:#?}", value)
+            SendMailError::Increment(error) => {
+                write!(formatter, "{}", error)
             }
         }
     }
 }
 
-impl ResponseError for ReceiveMailError {
+impl ResponseError for SendMailError {
     fn error_response(&self) -> HttpResponse<BoxBody> {
-        HttpResponse::Forbidden().body(self.to_string())
+        HttpResponse::InternalServerError().body(self.to_string())
     }
 }
 
-/// Returns true if all required labels are present, otherwise returns false.
-fn check_labels(required: &HashSet<String>, labels: &Labels) -> bool {
-    required.iter().all(|value| labels.contains_key(value))
-}
+fn increment(pool: Data<R2D2Pool>) -> Result<(), SendMailError> {
+    let mut connection = get_connection(&pool).map_err(SendMailError::CreateRedisConnection)?;
 
-/// Returns true if all attachments are signed, or if there are no attachments, otherwise returns false.
-fn check_attachments(attachments: LetterAttachments) -> bool {
-    if attachments.embedded.is_empty() && attachments.remote.is_empty() {
-        return true;
-    }
-
-    if attachments.embedded.iter().any(|value| value.signature.is_none()) {
-        return false;
-    }
-
-    if attachments.remote.iter().any(|value| value.signature.is_none()) {
-        return false;
-    }
-
-    true
-}
-
-fn verify_letter(letter: SealedLetter, configuration: Data<MailConfiguration>) -> Result<(), ReceiveMailError> {
-    if letter.recipients.is_empty() {
-        return Err(ReceiveMailError::NoRecipients);
-    }
-
-    if !configuration.accept.anomyous_sender && letter.sender.is_none() {
-        return Err(ReceiveMailError::AnonymousSender);
-    }
-
-    if !configuration.accept.unsigned && letter.signature.is_none() {
-        return Err(ReceiveMailError::Unsigned);
-    }
-
-    if !configuration.accept.unsigned_attachments && letter.attachments.is_some_and(check_attachments) {
-        return Err(ReceiveMailError::UnsignedAttachments);
-    }
-
-    if configuration.require.subject && letter.subject.is_none() {
-        return Err(ReceiveMailError::NoSubject);
-    }
-
-    if configuration.require.body && letter.body.is_none() {
-        return Err(ReceiveMailError::NoBody);
-    }
-
-    let required_labels = &configuration.require.labels;
-
-    if !required_labels.is_empty() && check_labels(required_labels, &letter.labels) {
-        return Err(ReceiveMailError::MissingLabels(required_labels.clone()));
-    }
+    connection.incr::<&str, u64, ()>(TOTAL_SENT_LETTERS, 1).map_err(SendMailError::Increment)?;
 
     Ok(())
 }
 
-#[post("")]
-pub async fn receive_mail(
-    json: Json<SealedLetter>,
-    configuration: Data<MailConfiguration>,
-    state: Data<MailState>
-) -> Result<impl Responder> {
-    let letter = json.into_inner();
+#[get("")]
+pub async fn send_mail(pool: Data<R2D2Pool>) -> Result<impl Responder> {
+    block(|| increment(pool)).await??;
 
-    verify_letter(letter.clone(), configuration)?;
+    let sender = Address {
+        id: Identifier::new(),
+        host: String::from("example.com")
+    };
+    let recipients = vec![
+        Address {
+            id: Identifier::new(),
+            host: String::from("example.com")
+        }
+    ];
+    let embedded = vec![
+        EmbeddedAttachment {
+            id: Identifier::new(),
+            size: 0,
+            labels: Default::default(),
+            data: vec![].into(),
+            signature: Some(
+                vec![].into()
+            )
+        }
+    ];
+    let remote = vec![
+        RemoteAttachment {
+            id: Identifier::new(),
+            address: Address {
+                id: Identifier::new(),
+                host: String::from("example.com")
+            },
+            size: 0,
+            labels: Default::default(),
+            signature: Some(
+                vec![].into()
+            )
+        }
+    ];
+    let attachments = LetterAttachments {
+        embedded,
+        remote
+    };
+    let letter = SealedLetter {
+        id: Identifier::new(),
+        sender: Some(sender),
+        recipients,
+        attachments: Some(attachments),
+        labels: Default::default(),
+        subject: Some(
+            vec![].into()
+        ),
+        body: Some(
+            vec![].into()
+        ),
+        signature: Some(
+            vec![].into()
+        )
+    };
 
-    match letter.sender {
-        Some(value) => debug!("Received a letter from {}", value),
-        None => debug!("Received an anonymous letter")
-    }
+    let response = Json(letter);
 
-    let mut counter = state.total_received_letters.lock().unwrap();
-
-    *counter += 1;
-
-    Ok(HttpResponse::Ok())
+    Ok(response)
 }
